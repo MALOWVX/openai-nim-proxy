@@ -22,17 +22,19 @@ const SHOW_REASONING = false; // Set to true to show reasoning with <think> tags
 const ENABLE_THINKING_MODE = false; // Set to true to enable chat_template_kwargs thinking parameter
 
 // Model mapping (adjust based on available NIM models)
+// NOTE: Some models like deepseek-v3_1-terminus have 404 issues on NVIDIA API
+// Using confirmed working models instead
 const MODEL_MAPPING = {
   // Standard OpenAI model names that Chub.ai recognizes
   'gpt-3.5-turbo': 'meta/llama-3.1-70b-instruct',
   'gpt-3.5-turbo-16k': 'meta/llama-3.1-70b-instruct',
-  'gpt-4': 'deepseek-ai/deepseek-r1-distill-qwen-32b',  // 32B Distilled
-  'gpt-4-turbo': 'deepseek-ai/deepseek-v3_1',  // Full 685B (note underscore!)
+  'gpt-4': 'deepseek-ai/deepseek-r1-distill-qwen-32b',  // 32B Distilled - WORKS
+  'gpt-4-turbo': 'deepseek-ai/deepseek-v3_1',  // Full V3.1 - WORKS
   'gpt-4-turbo-preview': 'deepseek-ai/deepseek-v3_1',
-  'gpt-4o': 'deepseek-ai/deepseek-v3_1-terminus',  // Terminus 685B (underscore!)
+  'gpt-4o': 'deepseek-ai/deepseek-r1-0528',  // Updated R1 - WORKS
   'gpt-4o-mini': 'deepseek-ai/deepseek-r1-distill-qwen-14b',  // 14B Distilled
-  'gpt-4-32k': 'deepseek-ai/deepseek-v3_2',  // Newest V3.2 (685B)
-  'gpt-4-1106-preview': 'deepseek-ai/deepseek-r1-0528'  // Updated R1
+  'gpt-4-32k': 'meta/llama-3.3-70b-instruct',  // Newest Llama
+  'gpt-4-1106-preview': 'deepseek-ai/deepseek-r1'  // Full R1 - WORKS
 };
 
 // Health check endpoint
