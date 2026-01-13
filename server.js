@@ -29,7 +29,7 @@ const MODEL_MAPPING = {
   'gpt-3.5-turbo': 'meta/llama-3.1-70b-instruct',
   'gpt-3.5-turbo-16k': 'meta/llama-3.1-70b-instruct',
   'gpt-4': 'deepseek-ai/deepseek-r1-distill-qwen-32b',  // 32B Distilled - WORKS
-  'gpt-4-turbo': 'deepseek-ai/deepseek-v3.1',  // Full V3.1 - WORKS
+  'gpt-4-turbo': 'deepseek-ai/deepseek-v3_1',  // Full V3.1 - WORKS
   'gpt-4-turbo-preview': 'deepseek-ai/deepseek-v3_1',
   'gpt-4o': 'deepseek-ai/deepseek-r1-0528',  // Updated R1 - WORKS
   'gpt-4o-mini': 'deepseek-ai/deepseek-r1-distill-qwen-14b',  // 14B Distilled
@@ -87,6 +87,15 @@ app.post('/v1/chat/completions', async (req, res) => {
       content: msg.content || ''
     }));
     
+    // Add system message to encourage longer responses if not present
+    const hasSystemMessage = cleanedMessages.some(msg => msg.role === 'system');
+    if (!hasSystemMessage) {
+      cleanedMessages.unshift({
+        role: 'system',
+        content: 'Write detailed, descriptive responses of at least 3-4 paragraphs. Include rich sensory details, character thoughts, emotions, and environmental descriptions. Avoid brief or rushed responses.'
+      });
+    }
+    
     // Smart model selection with fallback
     let nimModel = MODEL_MAPPING[model];
     if (!nimModel) {
@@ -121,8 +130,8 @@ app.post('/v1/chat/completions', async (req, res) => {
     const nimRequest = {
       model: nimModel,
       messages: cleanedMessages, // Use cleaned messages
-      temperature: temperature || 0.6,
-      max_tokens: Math.min(max_tokens || 2048, 8192), // Limit max_tokens
+      temperature: temperature || DEFAULT_TEMPERATURE,
+      max_tokens: Math.min(max_tokens || MIN_RESPONSE_TOKENS, 8192),
       stream: stream || false
     };
     
