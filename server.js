@@ -8,30 +8,33 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ limit: '50mb' })); // Increase payload limit
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // NVIDIA NIM API configuration
 const NIM_API_BASE = process.env.NIM_API_BASE || 'https://integrate.api.nvidia.com/v1';
 const NIM_API_KEY = process.env.NIM_API_KEY;
 
-// Configuration
-const SHOW_REASONING = false;
-const ENABLE_THINKING_MODE = false;
-const MIN_RESPONSE_TOKENS = 4096;
-const DEFAULT_TEMPERATURE = 0.7;
+// 🔥 REASONING DISPLAY TOGGLE - Shows/hides reasoning in output
+const SHOW_REASONING = false; // Set to true to show reasoning with <think> tags
 
-// Model mapping
+// 🔥 THINKING MODE TOGGLE - Enables thinking for specific models that support it
+const ENABLE_THINKING_MODE = false; // Set to true to enable chat_template_kwargs thinking parameter
+
+// Model mapping (adjust based on available NIM models)
+// NOTE: Some models like deepseek-v3_1-terminus have 404 issues on NVIDIA API
+// Using confirmed working models instead
 const MODEL_MAPPING = {
+  // Standard OpenAI model names that Chub.ai recognizes
   'gpt-3.5-turbo': 'meta/llama-3.1-70b-instruct',
   'gpt-3.5-turbo-16k': 'meta/llama-3.1-70b-instruct',
-  'gpt-4': 'deepseek-ai/deepseek-r1-distill-qwen-32b',
-  'gpt-4-turbo': 'deepseek-ai/deepseek-v3.1',
+  'gpt-4': 'deepseek-ai/deepseek-r1-distill-qwen-32b',  // 32B Distilled - WORKS
+  'gpt-4-turbo': 'deepseek-ai/deepseek-v3.1',  // Full V3.1 - WORKS
   'gpt-4-turbo-preview': 'deepseek-ai/deepseek-v3_1',
-  'gpt-4o': 'deepseek-ai/deepseek-r1-0528',
-  'gpt-4o-mini': 'deepseek-ai/deepseek-r1-distill-qwen-14b',
-  'gpt-4-32k': 'meta/llama-3.3-70b-instruct',
-  'gpt-4-1106-preview': 'deepseek-ai/deepseek-r1'
+  'gpt-4o': 'deepseek-ai/deepseek-r1-0528',  // Updated R1 - WORKS
+  'gpt-4o-mini': 'deepseek-ai/deepseek-r1-distill-qwen-14b',  // 14B Distilled
+  'gpt-4-32k': 'meta/llama-3.3-70b-instruct',  // Newest Llama
+  'gpt-4-1106-preview': 'deepseek-ai/deepseek-r1'  // Full R1 - WORKS
 };
 
 // Health check endpoint
@@ -44,7 +47,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-// List models endpoint
+// List models endpoint (OpenAI compatible)
 app.get('/v1/models', (req, res) => {
   const models = Object.keys(MODEL_MAPPING).map(model => ({
     id: model,
@@ -59,7 +62,7 @@ app.get('/v1/models', (req, res) => {
   });
 });
 
-// Chat completions endpoint
+// Chat completions endpoint (main proxy)
 app.post('/v1/chat/completions', async (req, res) => {
   try {
     const { model, messages, temperature, max_tokens, stream } = req.body;
@@ -75,25 +78,16 @@ app.post('/v1/chat/completions', async (req, res) => {
       });
     }
     
-    // Limit message history
-    const limitedMessages = messages.slice(-20);
+    // Limit message history to prevent payload too large errors
+    const limitedMessages = messages.slice(-20); // Keep last 20 messages only
     
-    // Clean messages
+    // Clean messages - remove any invalid fields
     const cleanedMessages = limitedMessages.map(msg => ({
       role: msg.role,
       content: msg.content || ''
     }));
     
-    // Add system message for longer responses if not present
-    const hasSystemMessage = cleanedMessages.some(msg => msg.role === 'system');
-    if (!hasSystemMessage) {
-      cleanedMessages.unshift({
-        role: 'system',
-        content: 'Write detailed, descriptive responses of at least 3-4 paragraphs. Include rich sensory details, character thoughts, emotions, and environmental descriptions. Avoid brief or rushed responses.'
-      });
-    }
-    
-    // Model selection with fallback
+    // Smart model selection with fallback
     let nimModel = MODEL_MAPPING[model];
     if (!nimModel) {
       try {
@@ -123,15 +117,16 @@ app.post('/v1/chat/completions', async (req, res) => {
       }
     }
     
-    // Build request
+    // Transform OpenAI request to NIM format
     const nimRequest = {
       model: nimModel,
-      messages: cleanedMessages,
-      temperature: temperature || DEFAULT_TEMPERATURE,
-      max_tokens: Math.min(max_tokens || MIN_RESPONSE_TOKENS, 8192),
+      messages: cleanedMessages, // Use cleaned messages
+      temperature: temperature || 0.6,
+      max_tokens: Math.min(max_tokens || 2048, 8192), // Limit max_tokens
       stream: stream || false
     };
     
+    // Only add extra_body if thinking mode is enabled
     if (ENABLE_THINKING_MODE) {
       nimRequest.extra_body = { chat_template_kwargs: { thinking: true } };
     }
@@ -148,6 +143,7 @@ app.post('/v1/chat/completions', async (req, res) => {
     });
     
     if (stream) {
+      // Handle streaming response with reasoning
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
@@ -217,6 +213,7 @@ app.post('/v1/chat/completions', async (req, res) => {
         res.end();
       });
     } else {
+      // Transform NIM response to OpenAI format with reasoning
       const openaiResponse = {
         id: `chatcmpl-${Date.now()}`,
         object: 'chat.completion',
@@ -252,6 +249,7 @@ app.post('/v1/chat/completions', async (req, res) => {
     console.error('Proxy error:', error.message);
     console.error('Error details:', error.response?.data);
     
+    // Log the full error for debugging
     const errorDetails = error.response?.data || error.message;
     console.log('Full error:', JSON.stringify(errorDetails, null, 2));
     
@@ -260,13 +258,13 @@ app.post('/v1/chat/completions', async (req, res) => {
         message: errorDetails?.detail || error.message || 'Internal server error',
         type: 'invalid_request_error',
         code: error.response?.status || 500,
-        nvidia_error: errorDetails
+        nvidia_error: errorDetails // Include NVIDIA's actual error
       }
     });
   }
 });
 
-// Catch-all
+// Catch-all for unsupported endpoints
 app.all('*', (req, res) => {
   res.status(404).json({
     error: {
