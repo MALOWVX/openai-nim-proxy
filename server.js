@@ -31,7 +31,7 @@ const MODEL_MAPPING = {
   'gpt-4': 'deepseek-ai/deepseek-r1-distill-qwen-32b',  // 32B Distilled - WORKS
   'gpt-4-turbo': 'deepseek-ai/deepseek-v3.1',  // Full V3.1 - WORKS
   'gpt-4-turbo-preview': 'deepseek-ai/deepseek-v3_1',
-  'gpt-4o': 'z-ai/glm4_7',  // Updated R1 - WORKS
+  'gpt-4o': 'z-ai/glm4.7',  // Updated R1 - WORKS
   'gpt-4o-mini': 'deepseek-ai/deepseek-r1-0528',  // 14B Distilled
   'gpt-4-32k': 'meta/llama-3.3-70b-instruct',  // Newest Llama
   'gpt-4-1106-preview': 'deepseek-ai/deepseek-r1'  // Full R1 - WORKS
