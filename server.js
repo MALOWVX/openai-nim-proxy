@@ -21,6 +21,12 @@ const SHOW_REASONING = false; // Set to true to show reasoning with <think> tags
 // 🔥 THINKING MODE TOGGLE - Enables thinking for specific models that support it
 const ENABLE_THINKING_MODE = false; // Set to true to enable chat_template_kwargs thinking parameter
 
+// 🔥 Estimate token count from text (~4 chars per token for English, ~3 for mixed)
+function estimateTokens(text) {
+    if (!text) return 0;
+    return Math.ceil(text.length / 3.5);
+}
+
 // Model mapping (adjust based on available NIM models)
 // NOTE: Some models like deepseek-v3_1-terminus have 404 issues on NVIDIA API
 // Using confirmed working models instead
@@ -36,6 +42,24 @@ const MODEL_MAPPING = {
     'gpt-4-32k': 'meta/llama-3.3-70b-instruct',  // Newest Llama
     'gpt-4-1106-preview': 'deepseek-ai/deepseek-r1'  // Full R1 - WORKS
 };
+
+// 🔥 Context window sizes per NIM model (in tokens)
+// Set to the REAL model max — Janitor.ai already limits on its side,
+// this acts as a safety net if the client sends too much
+const MODEL_CONTEXT_SIZES = {
+    'meta/llama-3.1-70b-instruct': 128000,
+    'meta/llama-3.1-405b-instruct': 128000,
+    'meta/llama-3.1-8b-instruct': 128000,
+    'meta/llama-3.3-70b-instruct': 128000,
+    'deepseek-ai/deepseek-v3.1-terminus': 128000,
+    'deepseek-ai/deepseek-v3.1': 128000,
+    'deepseek-ai/deepseek-v3_1': 128000,
+    'deepseek-ai/deepseek-r1-0528': 164000,
+    'deepseek-ai/deepseek-r1': 164000,
+    'z-ai/glm4.7': 131072,  // 131K confirmed on NVIDIA NIM
+};
+const DEFAULT_CONTEXT_SIZE = 32000;
+const RESPONSE_RESERVE_TOKENS = 4096; // Reserve for model output
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -78,23 +102,7 @@ app.post('/v1/chat/completions', async (req, res) => {
             });
         }
 
-        // 🔥 FIX: Always preserve system messages (bot setup/identity) 
-        // then keep the most recent conversation messages
-        const systemMessages = messages.filter(msg => msg.role === 'system');
-        const nonSystemMessages = messages.filter(msg => msg.role !== 'system');
-
-        // Keep all system messages + last 40 conversation messages
-        // (increased from 20 to give more memory context)
-        const recentMessages = nonSystemMessages.slice(-40);
-        const limitedMessages = [...systemMessages, ...recentMessages];
-
-        // Clean messages - remove any invalid fields
-        const cleanedMessages = limitedMessages.map(msg => ({
-            role: msg.role,
-            content: msg.content || ''
-        }));
-
-        // Smart model selection with fallback
+        // Smart model selection with fallback (moved BEFORE message trimming to know context size)
         let nimModel = MODEL_MAPPING[model];
         if (!nimModel) {
             try {
@@ -123,6 +131,47 @@ app.post('/v1/chat/completions', async (req, res) => {
                 }
             }
         }
+
+        // 🔥 TOKEN-AWARE CONTEXT MANAGEMENT
+        // Use the model's actual context window instead of an arbitrary message limit
+        const contextSize = MODEL_CONTEXT_SIZES[nimModel] || DEFAULT_CONTEXT_SIZE;
+        const maxInputTokens = contextSize - RESPONSE_RESERVE_TOKENS;
+
+        // 1. Always keep ALL system messages (bot identity, hero descriptions, etc.)
+        const systemMessages = messages.filter(msg => msg.role === 'system');
+        const nonSystemMessages = messages.filter(msg => msg.role !== 'system');
+
+        // 2. Calculate tokens used by system messages
+        let usedTokens = 0;
+        const cleanedSystemMessages = systemMessages.map(msg => {
+            const cleaned = { role: msg.role, content: msg.content || '' };
+            usedTokens += estimateTokens(cleaned.content) + 4; // +4 for role/formatting overhead
+            return cleaned;
+        });
+
+        // 3. Fill remaining context with recent conversation messages (newest first)
+        const remainingTokenBudget = maxInputTokens - usedTokens;
+        const cleanedConversation = [];
+        let conversationTokens = 0;
+
+        // Iterate from newest to oldest, keep as many as fit
+        for (let i = nonSystemMessages.length - 1; i >= 0; i--) {
+            const msg = nonSystemMessages[i];
+            const cleaned = { role: msg.role, content: msg.content || '' };
+            const msgTokens = estimateTokens(cleaned.content) + 4;
+
+            if (conversationTokens + msgTokens > remainingTokenBudget) {
+                break; // No more room
+            }
+            cleanedConversation.unshift(cleaned); // Add to front to maintain order
+            conversationTokens += msgTokens;
+        }
+
+        // 4. Combine: system messages first, then conversation
+        const cleanedMessages = [...cleanedSystemMessages, ...cleanedConversation];
+
+        console.log(`📊 Context: ${usedTokens + conversationTokens}/${maxInputTokens} tokens | ${cleanedSystemMessages.length} system + ${cleanedConversation.length}/${nonSystemMessages.length} conversation msgs`);
+
 
         // Transform OpenAI request to NIM format
         const nimRequest = {
