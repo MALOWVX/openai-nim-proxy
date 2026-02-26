@@ -187,6 +187,11 @@ app.post('/v1/chat/completions', async (req, res) => {
             nimRequest.extra_body = { chat_template_kwargs: { thinking: true } };
         }
 
+        // 🔍 DEBUG: Log payload size to diagnose large request issues
+        const payloadJson = JSON.stringify(nimRequest);
+        const payloadSizeKB = (Buffer.byteLength(payloadJson, 'utf8') / 1024).toFixed(1);
+        console.log(`🔍 DEBUG: Payload size: ${payloadSizeKB} KB | Model: ${nimModel} | Messages: ${cleanedMessages.length} | Stream: ${stream || false}`);
+
         console.log('Sending to NVIDIA:', { model: nimModel, messageCount: cleanedMessages.length });
 
         // Make request to NVIDIA NIM API
@@ -302,12 +307,15 @@ app.post('/v1/chat/completions', async (req, res) => {
         }
 
     } catch (error) {
-        console.error('Proxy error:', error.message);
-        console.error('Error details:', error.response?.data);
+        // 🔍 DEBUG: Safe error logging (no full object dumps, no leaked credentials)
+        const status = error.response?.status || 'N/A';
+        const nvidiaError = error.response?.data;
+        const errorDetail = typeof nvidiaError === 'object' ? (nvidiaError?.detail || nvidiaError?.error?.message || JSON.stringify(nvidiaError).slice(0, 500)) : String(nvidiaError || '').slice(0, 500);
 
-        // Log the full error for debugging
-        const errorDetails = error.response?.data || error.message;
-        console.log('Full error:', JSON.stringify(errorDetails, null, 2));
+        console.error(`❌ Proxy error: status=${status} | message=${error.message}`);
+        console.error(`❌ NVIDIA response (truncated): ${errorDetail}`);
+
+        const errorDetails = error.response?.data || { message: error.message };
 
         res.status(error.response?.status || 500).json({
             error: {
