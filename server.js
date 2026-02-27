@@ -307,22 +307,33 @@ app.post('/v1/chat/completions', async (req, res) => {
         }
 
     } catch (error) {
-        // 🔍 DEBUG: Safe error logging (no full object dumps, no leaked credentials)
+        // 🔍 Safe error logging — handles circular references from axios/TLS errors
         const status = error.response?.status || 'N/A';
         const nvidiaError = error.response?.data;
-        const errorDetail = typeof nvidiaError === 'object' ? (nvidiaError?.detail || nvidiaError?.error?.message || JSON.stringify(nvidiaError).slice(0, 500)) : String(nvidiaError || '').slice(0, 500);
+
+        // Safely extract error detail without JSON.stringify on potentially circular objects
+        let errorDetail = 'unknown';
+        try {
+            if (nvidiaError && typeof nvidiaError === 'object') {
+                errorDetail = nvidiaError.detail || nvidiaError.error?.message || nvidiaError.message || '[object - could not extract detail]';
+            } else if (nvidiaError) {
+                errorDetail = String(nvidiaError).slice(0, 500);
+            }
+        } catch (e) {
+            errorDetail = 'Failed to parse NVIDIA error';
+        }
 
         console.error(`❌ Proxy error: status=${status} | message=${error.message}`);
-        console.error(`❌ NVIDIA response (truncated): ${errorDetail}`);
+        console.error(`❌ NVIDIA response: ${errorDetail}`);
 
-        const errorDetails = error.response?.data || { message: error.message };
+        // Build a safe, serializable error message (no raw axios objects)
+        const safeErrorMessage = (typeof errorDetail === 'string') ? errorDetail : error.message || 'Internal server error';
 
         res.status(error.response?.status || 500).json({
             error: {
-                message: errorDetails?.detail || error.message || 'Internal server error',
+                message: safeErrorMessage,
                 type: 'invalid_request_error',
-                code: error.response?.status || 500,
-                nvidia_error: errorDetails // Include NVIDIA's actual error
+                code: error.response?.status || 500
             }
         });
     }
