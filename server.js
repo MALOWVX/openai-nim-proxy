@@ -194,13 +194,14 @@ app.post('/v1/chat/completions', async (req, res) => {
 
         console.log('Sending to NVIDIA:', { model: nimModel, messageCount: cleanedMessages.length });
 
-        // Make request to NVIDIA NIM API
+        // Make request to NVIDIA NIM API (120s timeout to avoid infinite hangs)
         const response = await axios.post(`${NIM_API_BASE}/chat/completions`, nimRequest, {
             headers: {
                 'Authorization': `Bearer ${NIM_API_KEY}`,
                 'Content-Type': 'application/json'
             },
-            responseType: stream ? 'stream' : 'json'
+            responseType: stream ? 'stream' : 'json',
+            timeout: 120000 // 120 seconds
         });
 
         if (stream) {
@@ -307,22 +308,38 @@ app.post('/v1/chat/completions', async (req, res) => {
         }
 
     } catch (error) {
-        // 🔍 DEBUG: Safe error logging (no full object dumps, no leaked credentials)
+        // 🔍 Safe error logging — handles circular references, streams, HTML responses
         const status = error.response?.status || 'N/A';
-        const nvidiaError = error.response?.data;
-        const errorDetail = typeof nvidiaError === 'object' ? (nvidiaError?.detail || nvidiaError?.error?.message || JSON.stringify(nvidiaError).slice(0, 500)) : String(nvidiaError || '').slice(0, 500);
+        const isTimeout = error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT';
 
-        console.error(`❌ Proxy error: status=${status} | message=${error.message}`);
-        console.error(`❌ NVIDIA response (truncated): ${errorDetail}`);
+        // Safely extract error detail from various response shapes
+        let errorDetail = error.message || 'unknown error';
+        try {
+            const nvidiaError = error.response?.data;
+            if (nvidiaError && typeof nvidiaError === 'string') {
+                errorDetail = nvidiaError.slice(0, 500);
+            } else if (nvidiaError && typeof nvidiaError === 'object') {
+                // Only access simple string properties — avoid anything that could be a stream/socket
+                const extracted = nvidiaError.detail || nvidiaError.error?.message || nvidiaError.message;
+                if (typeof extracted === 'string') {
+                    errorDetail = extracted;
+                }
+            }
+        } catch (e) {
+            // Keep the default error.message
+        }
 
-        const errorDetails = error.response?.data || { message: error.message };
+        if (isTimeout) {
+            errorDetail = `NVIDIA API timeout after 120s — the model may be overloaded. Original: ${error.message}`;
+        }
 
-        res.status(error.response?.status || 500).json({
+        console.error(`❌ Proxy error: status=${status} | timeout=${isTimeout} | ${errorDetail}`);
+
+        res.status(error.response?.status || (isTimeout ? 504 : 500)).json({
             error: {
-                message: errorDetails?.detail || error.message || 'Internal server error',
-                type: 'invalid_request_error',
-                code: error.response?.status || 500,
-                nvidia_error: errorDetails // Include NVIDIA's actual error
+                message: errorDetail,
+                type: isTimeout ? 'timeout_error' : 'invalid_request_error',
+                code: error.response?.status || (isTimeout ? 504 : 500)
             }
         });
     }
