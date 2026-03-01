@@ -57,6 +57,9 @@ const MODEL_CONTEXT_SIZES = {
     'deepseek-ai/deepseek-r1-0528': 164000,
     'deepseek-ai/deepseek-r1': 164000,
     'z-ai/glm4.7': 131072,  // 131K confirmed on NVIDIA NIM
+    'z-ai/glm5': 128000,
+    'moonshotai/kimi-k2.5': 128000,
+    
 };
 const DEFAULT_CONTEXT_SIZE = 32000;
 const RESPONSE_RESERVE_TOKENS = 4096; // Reserve for model output
