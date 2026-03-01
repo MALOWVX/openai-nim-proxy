@@ -35,7 +35,7 @@ const MODEL_MAPPING = {
     'gpt-3.5-turbo': 'meta/llama-3.1-70b-instruct',
     'gpt-3.5-turbo-16k': 'meta/llama-3.1-70b-instruct',
     'gpt-4': 'z-ai/glm5',  // 32B Distilled - WORKS
-    'gpt-4-turbo': 'deepseek-ai/deepseek-v3.1',  // Full V3.1 - WORKS
+    'gpt-4-turbo': 'moonshotai/kimi-k2.5',  // Full V3.1 - WORKS
     'gpt-4-turbo-preview': 'deepseek-ai/deepseek-v3_1',
     'gpt-4o': 'z-ai/glm4.7',  // Updated R1 - WORKS
     'gpt-4o-mini': 'deepseek-ai/deepseek-r1-0528',  // 14B Distilled
