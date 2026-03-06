@@ -35,7 +35,7 @@ const MODEL_MAPPING = {
     'gpt-3.5-turbo': 'meta/llama-3.1-70b-instruct',
     'gpt-3.5-turbo-16k': 'meta/llama-3.1-70b-instruct',
     'gpt-4': 'z-ai/glm5',  // 32B Distilled - WORKS
-    'gpt-4-turbo': 'moonshotai/kimi-k2.5',  // Full V3.1 - WORKS
+    'gpt-4-turbo': 'deepseek-ai/deepseek-v3.2',  // Full V3.1 - WORKS
     'gpt-4-turbo-preview': 'deepseek-ai/deepseek-v3_1',
     'gpt-4o': 'z-ai/glm4.7',  // Updated R1 - WORKS
     'gpt-4o-mini': 'deepseek-ai/deepseek-r1-0528',  // 14B Distilled
@@ -58,7 +58,7 @@ const MODEL_CONTEXT_SIZES = {
     'deepseek-ai/deepseek-r1': 164000,
     'z-ai/glm4.7': 131072,  // 131K confirmed on NVIDIA NIM
     'z-ai/glm5': 128000,
-    'moonshotai/kimi-k2.5': 128000,
+    'deepseek-ai/deepseek-v3.2': 128000,
     
 };
 const DEFAULT_CONTEXT_SIZE = 32000;
