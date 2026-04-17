@@ -31,16 +31,16 @@ function estimateTokens(text) {
 // NOTE: Some models like deepseek-v3_1-terminus have 404 issues on NVIDIA API
 // Using confirmed working models instead
 const MODEL_MAPPING = {
-    // Standard OpenAI model names that Chub.ai recognizes
     'gpt-3.5-turbo': 'meta/llama-3.1-70b-instruct',
     'gpt-3.5-turbo-16k': 'meta/llama-3.1-70b-instruct',
     'gpt-4': 'z-ai/glm5',  // 32B Distilled - WORKS
     'gpt-4-turbo': 'deepseek-ai/deepseek-v3.2',  // NEW 685B - top tier
-    'gpt-4-turbo-preview': 'deepseek-ai/deepseek-v3.1',  // Full V3.1 - WORKS
-    'gpt-4o': 'z-ai/glm-4.7',  // Updated R1 - WORKS
-    'gpt-4o-mini': 'deepseek-ai/deepseek-v3_1-terminus',  // Fixed: underscore not dot
+    'gpt-4-turbo-preview': 'deepseek-ai/deepseek-v3.2',  // V3.1 is 410 Gone, redirecting to V3.2
+    'gpt-4o': 'z-ai/glm4.7',  // Updated R1 - WORKS
+    'glm4.7': 'z-ai/glm4.7',  // Direct mapping if user types it manually
+    'gpt-4o-mini': 'deepseek-ai/deepseek-v3.1-terminus',  // Fixed: 404 with underscore, must be dot
     'gpt-4-32k': 'meta/llama-3.3-70b-instruct',  // Newest Llama
-    'gpt-4-1106-preview': 'deepseek-ai/deepseek-r1'  // Full R1 - WORKS
+    'gpt-4-1106-preview': 'deepseek-ai/deepseek-v3.2'  // R1 is 410 Gone, redirecting
 };
 
 // 🔥 Context window sizes per NIM model (in tokens)
@@ -57,7 +57,7 @@ const MODEL_CONTEXT_SIZES = {
     'deepseek-ai/deepseek-v3_1': 128000,
     'deepseek-ai/deepseek-r1-0528': 164000,
     'deepseek-ai/deepseek-r1': 164000,
-    'z-ai/glm-4.7': 131072,
+    'z-ai/glm4.7': 131072,
     'z-ai/glm5': 128000,
 };
 const DEFAULT_CONTEXT_SIZE = 64000;  // Safe default for unknown models
