@@ -35,10 +35,10 @@ const MODEL_MAPPING = {
     'gpt-3.5-turbo': 'meta/llama-3.1-70b-instruct',
     'gpt-3.5-turbo-16k': 'meta/llama-3.1-70b-instruct',
     'gpt-4': 'z-ai/glm5',  // 32B Distilled - WORKS
-    'gpt-4-turbo': 'deepseek-ai/deepseek-v3.2',  // Full V3.1 - WORKS
-    'gpt-4-turbo-preview': 'deepseek-ai/deepseek-v3.1',
-    'gpt-4o': 'z-ai/glm4_7',  // Updated R1 - WORKS
-    'gpt-4o-mini': 'deepseek-ai/deepseek-v3.1-terminus',  // 14B Distilled
+    'gpt-4-turbo': 'deepseek-ai/deepseek-v3.2',  // NEW 685B - top tier
+    'gpt-4-turbo-preview': 'deepseek-ai/deepseek-v3.1',  // Full V3.1 - WORKS
+    'gpt-4o': 'z-ai/glm-4.7',  // Updated R1 - WORKS
+    'gpt-4o-mini': 'deepseek-ai/deepseek-v3_1-terminus',  // Fixed: underscore not dot
     'gpt-4-32k': 'meta/llama-3.3-70b-instruct',  // Newest Llama
     'gpt-4-1106-preview': 'deepseek-ai/deepseek-r1'  // Full R1 - WORKS
 };
@@ -53,15 +53,14 @@ const MODEL_CONTEXT_SIZES = {
     'meta/llama-3.3-70b-instruct': 128000,
     'deepseek-ai/deepseek-v3.1-terminus': 128000,
     'deepseek-ai/deepseek-v3.1': 128000,
+    'deepseek-ai/deepseek-v3.2': 128000,
     'deepseek-ai/deepseek-v3_1': 128000,
     'deepseek-ai/deepseek-r1-0528': 164000,
-    'deepseek-ai/deepseek-v3.1-terminus': 128000,
-    'z-ai/glm4_7': 131072,  // 131K confirmed on NVIDIA NIM
+    'deepseek-ai/deepseek-r1': 164000,
+    'z-ai/glm-4.7': 131072,
     'z-ai/glm5': 128000,
-    'deepseek-ai/deepseek-v3.2': 128000,
-    
 };
-const DEFAULT_CONTEXT_SIZE = 32000;
+const DEFAULT_CONTEXT_SIZE = 64000;  // Safe default for unknown models
 const RESPONSE_RESERVE_TOKENS = 4096; // Reserve for model output
 
 // Health check endpoint
@@ -108,31 +107,16 @@ app.post('/v1/chat/completions', async (req, res) => {
         // Smart model selection with fallback (moved BEFORE message trimming to know context size)
         let nimModel = MODEL_MAPPING[model];
         if (!nimModel) {
-            try {
-                await axios.post(`${NIM_API_BASE}/chat/completions`, {
-                    model: model,
-                    messages: [{ role: 'user', content: 'test' }],
-                    max_tokens: 1
-                }, {
-                    headers: { 'Authorization': `Bearer ${NIM_API_KEY}`, 'Content-Type': 'application/json' },
-                    validateStatus: (status) => status < 500
-                }).then(res => {
-                    if (res.status >= 200 && res.status < 300) {
-                        nimModel = model;
-                    }
-                });
-            } catch (e) { }
-
-            if (!nimModel) {
-                const modelLower = model.toLowerCase();
-                if (modelLower.includes('gpt-4') || modelLower.includes('claude-opus') || modelLower.includes('405b')) {
-                    nimModel = 'meta/llama-3.1-405b-instruct';
-                } else if (modelLower.includes('claude') || modelLower.includes('gemini') || modelLower.includes('70b')) {
-                    nimModel = 'meta/llama-3.1-70b-instruct';
-                } else {
-                    nimModel = 'meta/llama-3.1-8b-instruct';
-                }
+            // No probe test — just use smart fallback based on model name
+            const modelLower = (model || '').toLowerCase();
+            if (modelLower.includes('gpt-4') || modelLower.includes('claude-3') || modelLower.includes('claude-opus') || modelLower.includes('405b')) {
+                nimModel = 'deepseek-ai/deepseek-v3.2';  // Best available: 685B
+            } else if (modelLower.includes('claude') || modelLower.includes('gemini') || modelLower.includes('70b')) {
+                nimModel = 'meta/llama-3.3-70b-instruct';  // Confirmed working
+            } else {
+                nimModel = 'meta/llama-3.1-70b-instruct';  // Safe default (avoid 8B — may be deprecated)
             }
+            console.log(`⚠️ Unknown model "${model}" → fallback to ${nimModel}`);
         }
 
         // 🔥 TOKEN-AWARE CONTEXT MANAGEMENT
