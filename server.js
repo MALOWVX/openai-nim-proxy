@@ -36,8 +36,8 @@ const MODEL_MAPPING = {
     'gpt-4': 'z-ai/glm5',  // 32B Distilled - WORKS
     'gpt-4-turbo': 'deepseek-ai/deepseek-v3.2',  // NEW 685B - top tier
     'gpt-4-turbo-preview': 'deepseek-ai/deepseek-v3.2',  // V3.1 is 410 Gone, redirecting to V3.2
-    'gpt-4o': 'meta/llama-3.3-70b-instruct',  // TEMPORARY FIX: z-ai/glm4.7 is DEGRADED (Error 400) on NVIDIA
-    'glm4.7': 'meta/llama-3.3-70b-instruct',  // Redirecting to Llama 3.3 until NVIDIA fixes GLM4.7
+    'gpt-4o': 'z-ai/glm4.7',
+    'glm4.7': 'z-ai/glm4.7',
     'gpt-4o-mini': 'deepseek-ai/deepseek-v3.1-terminus',  // Fixed: 404 with underscore, must be dot
     'gpt-4-32k': 'meta/llama-3.3-70b-instruct',  // Newest Llama
     'gpt-4-1106-preview': 'deepseek-ai/deepseek-v3.2'  // R1 is 410 Gone, redirecting
