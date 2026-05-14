@@ -31,36 +31,42 @@ function estimateTokens(text) {
 // NOTE: Some models like deepseek-v3_1-terminus have 404 issues on NVIDIA API
 // Using confirmed working models instead
 const MODEL_MAPPING = {
-    'gpt-3.5-turbo': 'meta/llama-3.1-70b-instruct',
-    'gpt-3.5-turbo-16k': 'meta/llama-3.1-70b-instruct',
-    'gpt-4': 'z-ai/glm5',  // 32B Distilled - WORKS
-    'gpt-4-turbo': 'deepseek-ai/deepseek-v3.2',  // NEW 685B - top tier
-    'gpt-4-turbo-preview': 'deepseek-ai/deepseek-v3.2',  // V3.1 is 410 Gone, redirecting to V3.2
-    'gpt-4o': 'z-ai/glm4.7',
-    'glm4.7': 'z-ai/glm4.7',
-    'gpt-4o-mini': 'deepseek-ai/deepseek-v3.1-terminus',  // Fixed: 404 with underscore, must be dot
-    'gpt-4-32k': 'meta/llama-3.3-70b-instruct',  // Newest Llama
-    'gpt-4-1106-preview': 'deepseek-ai/deepseek-v3.2'  // R1 is 410 Gone, redirecting
+    // === 2026 UPDATED MAPPINGS — May 14 ===
+    // Tier 1: Best quality (use for main RP)
+    'gpt-4-turbo': 'deepseek-ai/deepseek-v4-pro',     // 🔥 NEW — 1M context, best DeepSeek
+    'gpt-4-1106-preview': 'deepseek-ai/deepseek-v4-pro',
+
+    // Tier 2: Fast & smart
+    'gpt-4o': 'z-ai/glm-5.1',                          // 🔥 Replaces deprecated GLM 4.7
+    'gpt-4': 'deepseek-ai/deepseek-v4-flash',           // 284B MoE, 1M context, fast
+    'gpt-4-turbo-preview': 'deepseek-ai/deepseek-v3.2', // 685B, still working
+
+    // Tier 3: Lighter / fallback
+    'gpt-4o-mini': 'mistralai/mistral-medium-3.5-128b',  // 128B, solid for chat
+    'gpt-4-32k': 'meta/llama-3.3-70b-instruct',          // Llama, still working
+    'gpt-3.5-turbo': 'meta/llama-3.3-70b-instruct',
+    'gpt-3.5-turbo-16k': 'meta/llama-3.3-70b-instruct',
 };
 
 // 🔥 Context window sizes per NIM model (in tokens)
 // Set to the REAL model max — Janitor.ai already limits on its side,
 // this acts as a safety net if the client sends too much
 const MODEL_CONTEXT_SIZES = {
+    // New 2026 models
+    'deepseek-ai/deepseek-v4-pro': 1000000,     // 1M tokens! 🔥
+    'deepseek-ai/deepseek-v4-flash': 1000000,   // 1M tokens
+    'z-ai/glm-5.1': 131072,                      // ~131K (estimated, same family as GLM 4.7)
+    'moonshotai/kimi-k2.6': 128000,              // estimated
+    'mistralai/mistral-medium-3.5-128b': 128000,
+    'minimaxai/minimax-m2.7': 128000,
+    // Older models still active
+    'deepseek-ai/deepseek-v3.2': 128000,
+    'deepseek-ai/deepseek-r1': 164000,
+    'meta/llama-3.3-70b-instruct': 128000,
     'meta/llama-3.1-70b-instruct': 128000,
     'meta/llama-3.1-405b-instruct': 128000,
-    'meta/llama-3.1-8b-instruct': 128000,
-    'meta/llama-3.3-70b-instruct': 128000,
-    'deepseek-ai/deepseek-v3.1-terminus': 128000,
-    'deepseek-ai/deepseek-v3.1': 128000,
-    'deepseek-ai/deepseek-v3.2': 128000,
-    'deepseek-ai/deepseek-v3_1': 128000,
-    'deepseek-ai/deepseek-r1-0528': 164000,
-    'deepseek-ai/deepseek-r1': 164000,
-    'z-ai/glm4.7': 131072,
-    'z-ai/glm5': 128000,
 };
-const DEFAULT_CONTEXT_SIZE = 64000;  // Safe default for unknown models
+const DEFAULT_CONTEXT_SIZE = 128000;  // Most models support at least 128K now
 const RESPONSE_RESERVE_TOKENS = 4096; // Reserve for model output
 
 // Health check endpoint
@@ -68,8 +74,15 @@ app.get('/health', (req, res) => {
     res.json({
         status: 'ok',
         service: 'OpenAI to NVIDIA NIM Proxy',
+        updated: '2026-05-14',
         reasoning_display: SHOW_REASONING,
-        thinking_mode: ENABLE_THINKING_MODE
+        thinking_mode: ENABLE_THINKING_MODE,
+        top_models: {
+            'gpt-4-turbo': 'deepseek-ai/deepseek-v4-pro (1M ctx)',
+            'gpt-4o':      'z-ai/glm-5.1 (131K ctx)',
+            'gpt-4':       'deepseek-ai/deepseek-v4-flash (1M ctx)',
+            'gpt-4o-mini': 'mistralai/mistral-medium-3.5-128b (128K ctx)',
+        }
     });
 });
 
@@ -110,11 +123,11 @@ app.post('/v1/chat/completions', async (req, res) => {
             // No probe test — just use smart fallback based on model name
             const modelLower = (model || '').toLowerCase();
             if (modelLower.includes('gpt-4') || modelLower.includes('claude-3') || modelLower.includes('claude-opus') || modelLower.includes('405b')) {
-                nimModel = 'deepseek-ai/deepseek-v3.2';  // Best available: 685B
+                nimModel = 'deepseek-ai/deepseek-v4-pro';    // Best: 1M context
             } else if (modelLower.includes('claude') || modelLower.includes('gemini') || modelLower.includes('70b')) {
-                nimModel = 'meta/llama-3.3-70b-instruct';  // Confirmed working
+                nimModel = 'deepseek-ai/deepseek-v4-flash';  // Fast: 284B MoE, 1M context
             } else {
-                nimModel = 'meta/llama-3.1-70b-instruct';  // Safe default (avoid 8B — may be deprecated)
+                nimModel = 'meta/llama-3.3-70b-instruct';    // Safe default
             }
             console.log(`⚠️ Unknown model "${model}" → fallback to ${nimModel}`);
         }
