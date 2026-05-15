@@ -11,6 +11,12 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' })); // Increase payload limit
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+// 🔧 Normalize URL path to lowercase (fixes /V1/ vs /v1/ case sensitivity issues)
+app.use((req, res, next) => {
+    req.url = req.url.toLowerCase();
+    next();
+});
+
 // NVIDIA NIM API configuration
 const NIM_API_BASE = process.env.NIM_API_BASE || 'https://integrate.api.nvidia.com/v1';
 const NIM_API_KEY = process.env.NIM_API_KEY;
@@ -91,8 +97,8 @@ app.get('/health', (req, res) => {
         thinking_mode: ENABLE_THINKING_MODE,
         top_models: {
             'gpt-4-turbo': 'deepseek-ai/deepseek-v4-pro (1M ctx)',
-            'gpt-4o':      'z-ai/glm-5.1 (131K ctx)',
-            'gpt-4':       'deepseek-ai/deepseek-v4-flash (1M ctx)',
+            'gpt-4o': 'z-ai/glm-5.1 (131K ctx)',
+            'gpt-4': 'deepseek-ai/deepseek-v4-flash (1M ctx)',
             'gpt-4o-mini': 'mistralai/mistral-medium-3.5-128b (128K ctx)',
         }
     });
