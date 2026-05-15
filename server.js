@@ -27,6 +27,18 @@ function estimateTokens(text) {
     return Math.ceil(text.length / 3.5);
 }
 
+// 🔧 Fix paragraph formatting for newer models (DeepSeek v4, GLM 5.1+)
+// Some models return literal '\n' escape sequences instead of real newlines,
+// or collapse all paragraphs into a single block of text.
+function fixParagraphs(text) {
+    if (!text) return text;
+    // Replace literal \n (escaped) with real newlines
+    let fixed = text.replace(/\\n/g, '\n');
+    // Replace literal \r\n or \r with real newlines
+    fixed = fixed.replace(/\\r\\n/g, '\n').replace(/\\r/g, '\n');
+    return fixed;
+}
+
 // Model mapping (adjust based on available NIM models)
 // NOTE: Some models like deepseek-v3_1-terminus have 404 issues on NVIDIA API
 // Using confirmed working models instead
@@ -254,7 +266,7 @@ app.post('/v1/chat/completions', async (req, res) => {
                                     }
                                 } else {
                                     if (content) {
-                                        data.choices[0].delta.content = content;
+                                        data.choices[0].delta.content = fixParagraphs(content);
                                     } else {
                                         data.choices[0].delta.content = '';
                                     }
@@ -282,7 +294,7 @@ app.post('/v1/chat/completions', async (req, res) => {
                 created: Math.floor(Date.now() / 1000),
                 model: model,
                 choices: response.data.choices.map(choice => {
-                    let fullContent = choice.message?.content || '';
+                    let fullContent = fixParagraphs(choice.message?.content || '');
 
                     if (SHOW_REASONING && choice.message?.reasoning_content) {
                         fullContent = '<think>\n' + choice.message.reasoning_content + '\n</think>\n\n' + fullContent;
