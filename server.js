@@ -56,7 +56,7 @@ const MODEL_MAPPING = {
 
     // Tier 2: Fast & smart
     'gpt-4o': 'z-ai/glm-5.1',                          // 🔥 Replaces deprecated GLM 4.7
-    'gpt-4': 'deepseek-ai/deepseek-v4-flash',           // 284B MoE, 1M context, fast
+    'gpt-4': 'google/gemma-4-31b-it',           // 284B MoE, 1M context, fast
     'gpt-4-turbo-preview': 'deepseek-ai/deepseek-v3.2', // 685B, still working
 
     // Tier 3: Lighter / fallback
@@ -98,7 +98,7 @@ app.get('/health', (req, res) => {
         top_models: {
             'gpt-4-turbo': 'deepseek-ai/deepseek-v4-pro (1M ctx)',
             'gpt-4o': 'z-ai/glm-5.1 (131K ctx)',
-            'gpt-4': 'deepseek-ai/deepseek-v4-flash (1M ctx)',
+            'gpt-4': 'google/gemma-4-31b-it (1M ctx)',
             'gpt-4o-mini': 'mistralai/mistral-medium-3.5-128b (128K ctx)',
         }
     });
