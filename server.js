@@ -52,7 +52,7 @@ const MODEL_MAPPING = {
     // === 2026 UPDATED MAPPINGS — May 14 ===
     // Tier 1: Best quality (use for main RP)
     'gpt-4-turbo': 'deepseek-ai/deepseek-v4-pro',     // 🔥 NEW — 1M context, best DeepSeek
-    'gpt-4-1106-preview': 'deepseek-ai/deepseek-v4-pro',
+    'gpt-4-1106-preview': 'google/gemma-4-31b-it',
 
     // Tier 2: Fast & smart
     'gpt-4o': 'z-ai/glm-5.1',                          // 🔥 Replaces deprecated GLM 4.7
