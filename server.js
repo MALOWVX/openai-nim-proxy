@@ -61,6 +61,7 @@ function fixParagraphs(text) {
 //   - model: the actual model ID to send to that backend
 
 const MODEL_MAPPING = {
+<<<<<<< HEAD
     // === NVIDIA NIM Backend — DeepSeek, Llama, Mistral ===
     'gpt-4-turbo':         { backend: 'nvidia', model: 'deepseek-ai/deepseek-v4-pro' },      // 🔥 1M context, best DeepSeek
     'gpt-4-1106-preview':  { backend: 'nvidia', model: 'deepseek-ai/deepseek-v4-pro' },
@@ -73,13 +74,41 @@ const MODEL_MAPPING = {
     // === AgentRouter Backend — GLM, Claude ===
     'gpt-4o':              { backend: 'agentrouter', model: 'glm-5.1' },                      // 🔥 GLM 5.1 via AgentRouter (was broken on NVIDIA)
     'gpt-4o-mini':         { backend: 'agentrouter', model: 'claude-sonnet-4-6' },             // 🔥 Claude Sonnet 4.6 via AgentRouter
+=======
+    // === 2026 UPDATED MAPPINGS — May 14 ===
+    // Tier 1: Best quality (use for main RP)
+    'gpt-4-turbo': 'deepseek-ai/deepseek-v4-pro',     // 🔥 NEW — 1M context, best DeepSeek
+    'gpt-4-1106-preview': 'google/gemma-4-31b-it',
+
+    // Tier 2: Fast & smart
+    'gpt-4o': 'moonshotai/kimi-k2.6',                          // 🔥 Replaces deprecated GLM 4.7
+    'gpt-4': 'google/gemma-4-31b-it',           // 284B MoE, 1M context, fast
+    'gpt-4-turbo-preview': 'deepseek-ai/deepseek-v3.2', // 685B, still working
+
+    // Tier 3: Lighter / fallback
+    'gpt-4o-mini': 'mistralai/mistral-medium-3.5-128b',  // 128B, solid for chat
+    'gpt-4-32k': 'meta/llama-3.3-70b-instruct',          // Llama, still working
+    'gpt-3.5-turbo': 'meta/llama-3.3-70b-instruct',
+    'gpt-3.5-turbo-16k': 'meta/llama-3.3-70b-instruct',
+>>>>>>> 91eafa71f6c5b69a41577591fe5b16d78cf6a24b
 };
 
 // 🔥 Context window sizes per model (in tokens)
 const MODEL_CONTEXT_SIZES = {
+<<<<<<< HEAD
     // NVIDIA models
     'deepseek-ai/deepseek-v4-pro': 1000000,
     'deepseek-ai/deepseek-v4-flash': 1000000,
+=======
+    // New 2026 models
+    'deepseek-ai/deepseek-v4-pro': 1000000,     // 1M tokens! 🔥
+    'deepseek-ai/deepseek-v4-flash': 1000000,   // 1M tokens
+    'moonshotai/kimi-k2.6': 131072,                      // ~131K (estimated, same family as GLM 4.7)
+    'moonshotai/kimi-k2.6': 128000,              // estimated
+    'mistralai/mistral-medium-3.5-128b': 128000,
+    'minimaxai/minimax-m2.7': 128000,
+    // Older models still active
+>>>>>>> 91eafa71f6c5b69a41577591fe5b16d78cf6a24b
     'deepseek-ai/deepseek-v3.2': 128000,
     'deepseek-ai/deepseek-r1': 164000,
     'meta/llama-3.3-70b-instruct': 128000,
@@ -126,10 +155,17 @@ app.get('/health', (req, res) => {
             agentrouter: { configured: !!AGENTROUTER_API_KEY, base: AGENTROUTER_API_BASE },
         },
         top_models: {
+<<<<<<< HEAD
             'gpt-4-turbo': 'deepseek-ai/deepseek-v4-pro → NVIDIA (1M ctx)',
             'gpt-4o':      'glm-5.1 → AgentRouter (131K ctx)',
             'gpt-4':       'deepseek-ai/deepseek-v4-flash → NVIDIA (1M ctx)',
             'gpt-4o-mini': 'claude-sonnet-4-6 → AgentRouter (200K ctx)',
+=======
+            'gpt-4-turbo': 'deepseek-ai/deepseek-v4-pro (1M ctx)',
+            'gpt-4o': 'moonshotai/kimi-k2.6 (131K ctx)',
+            'gpt-4': 'google/gemma-4-31b-it (1M ctx)',
+            'gpt-4o-mini': 'mistralai/mistral-medium-3.5-128b (128K ctx)',
+>>>>>>> 91eafa71f6c5b69a41577591fe5b16d78cf6a24b
         }
     });
 });
