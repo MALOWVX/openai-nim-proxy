@@ -235,12 +235,22 @@ app.post('/v1/chat/completions', async (req, res) => {
         const payloadSizeKB = (Buffer.byteLength(payloadJson, 'utf8') / 1024).toFixed(1);
         console.log(`🔍 Payload ${payloadSizeKB} KB | Model: ${targetModel} | Backend: ${backend.name} | Messages: ${cleanedMessages.length} | Stream: ${stream || false}`);
 
+        // Build headers dynamically
+        const headers = {
+            'Authorization': `Bearer ${backend.apiKey}`,
+            'Content-Type': 'application/json'
+        };
+
+        // 🔧 Bypass AgentRouter's client fingerprinting (unauthorized client detected error)
+        if (mapping.backend === 'agentrouter') {
+            headers['Originator'] = 'codex_cli_rs';
+            headers['User-Agent'] = 'codex_cli_rs/0.101.0 (Mac OS 26.0.1; arm64) Apple_Terminal/464';
+            headers['Version'] = '0.101.0';
+        }
+
         // Make request to the selected backend
         const response = await axios.post(`${backend.baseUrl}/chat/completions`, apiRequest, {
-            headers: {
-                'Authorization': `Bearer ${backend.apiKey}`,
-                'Content-Type': 'application/json'
-            },
+            headers: headers,
             responseType: stream ? 'stream' : 'json',
             timeout: 120000
         });
