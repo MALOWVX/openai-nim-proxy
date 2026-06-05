@@ -8,7 +8,7 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
-app.use(express.json({ limit: '50mb' })); // Increase payload limit
+app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // 🔧 Normalize URL path to lowercase (fixes /V1/ vs /v1/ case sensitivity issues)
@@ -30,10 +30,10 @@ const AGENTROUTER_API_BASE = process.env.AGENTROUTER_API_BASE || 'https://agentr
 const AGENTROUTER_API_KEY = process.env.AGENTROUTER_API_KEY;
 
 // 🔥 REASONING DISPLAY TOGGLE - Shows/hides reasoning in output
-const SHOW_REASONING = false; // Set to true to show reasoning with <think> tags
+const SHOW_REASONING = false;
 
 // 🔥 THINKING MODE TOGGLE - Enables thinking for specific models that support it
-const ENABLE_THINKING_MODE = false; // Set to true to enable chat_template_kwargs thinking parameter
+const ENABLE_THINKING_MODE = false;
 
 // 🔥 Estimate token count from text (~4 chars per token for English, ~3 for mixed)
 function estimateTokens(text) {
@@ -42,13 +42,9 @@ function estimateTokens(text) {
 }
 
 // 🔧 Fix paragraph formatting for newer models (DeepSeek v4, GLM 5.1+)
-// Some models return literal '\n' escape sequences instead of real newlines,
-// or collapse all paragraphs into a single block of text.
 function fixParagraphs(text) {
     if (!text) return text;
-    // Replace literal \n (escaped) with real newlines
     let fixed = text.replace(/\\n/g, '\n');
-    // Replace literal \r\n or \r with real newlines
     fixed = fixed.replace(/\\r\\n/g, '\n').replace(/\\r/g, '\n');
     return fixed;
 }
@@ -56,64 +52,30 @@ function fixParagraphs(text) {
 // =============================================
 // 🔧 MODEL MAPPING — Dual Backend Routing
 // =============================================
-// Each entry maps an OpenAI model name to:
-//   - backend: 'nvidia' or 'agentrouter'
-//   - model: the actual model ID to send to that backend
 
 const MODEL_MAPPING = {
-<<<<<<< HEAD
     // === NVIDIA NIM Backend — DeepSeek, Llama, Mistral ===
-    'gpt-4-turbo':         { backend: 'nvidia', model: 'deepseek-ai/deepseek-v4-pro' },      // 🔥 1M context, best DeepSeek
+    'gpt-4-turbo':         { backend: 'nvidia', model: 'deepseek-ai/deepseek-v4-pro' },
     'gpt-4-1106-preview':  { backend: 'nvidia', model: 'deepseek-ai/deepseek-v4-pro' },
-    'gpt-4':               { backend: 'nvidia', model: 'deepseek-ai/deepseek-v4-flash' },     // 284B MoE, 1M context, fast
-    'gpt-4-turbo-preview': { backend: 'nvidia', model: 'deepseek-ai/deepseek-v3.2' },         // 685B, still working
+    'gpt-4':               { backend: 'nvidia', model: 'deepseek-ai/deepseek-v4-flash' },
+    'gpt-4-turbo-preview': { backend: 'nvidia', model: 'deepseek-ai/deepseek-v3.2' },
     'gpt-4-32k':           { backend: 'nvidia', model: 'meta/llama-3.3-70b-instruct' },
     'gpt-3.5-turbo':       { backend: 'nvidia', model: 'meta/llama-3.3-70b-instruct' },
     'gpt-3.5-turbo-16k':   { backend: 'nvidia', model: 'meta/llama-3.3-70b-instruct' },
 
     // === AgentRouter Backend — GLM, Claude ===
-    'gpt-4o':              { backend: 'agentrouter', model: 'glm-5.1' },                      // 🔥 GLM 5.1 via AgentRouter (was broken on NVIDIA)
-    'gpt-4o-mini':         { backend: 'agentrouter', model: 'claude-sonnet-4-6' },             // 🔥 Claude Sonnet 4.6 via AgentRouter
-=======
-    // === 2026 UPDATED MAPPINGS — May 14 ===
-    // Tier 1: Best quality (use for main RP)
-    'gpt-4-turbo': 'deepseek-ai/deepseek-v4-pro',     // 🔥 NEW — 1M context, best DeepSeek
-    'gpt-4-1106-preview': 'google/gemma-4-31b-it',
-
-    // Tier 2: Fast & smart
-    'gpt-4o': 'moonshotai/kimi-k2.6',                          // 🔥 Replaces deprecated GLM 4.7
-    'gpt-4': 'google/gemma-4-31b-it',           // 284B MoE, 1M context, fast
-    'gpt-4-turbo-preview': 'deepseek-ai/deepseek-v3.2', // 685B, still working
-
-    // Tier 3: Lighter / fallback
-    'gpt-4o-mini': 'mistralai/mistral-medium-3.5-128b',  // 128B, solid for chat
-    'gpt-4-32k': 'meta/llama-3.3-70b-instruct',          // Llama, still working
-    'gpt-3.5-turbo': 'meta/llama-3.3-70b-instruct',
-    'gpt-3.5-turbo-16k': 'meta/llama-3.3-70b-instruct',
->>>>>>> 91eafa71f6c5b69a41577591fe5b16d78cf6a24b
+    'gpt-4o':              { backend: 'agentrouter', model: 'glm-5.1' },
+    'gpt-4o-mini':         { backend: 'agentrouter', model: 'claude-sonnet-4-6' },
 };
 
 // 🔥 Context window sizes per model (in tokens)
 const MODEL_CONTEXT_SIZES = {
-<<<<<<< HEAD
     // NVIDIA models
     'deepseek-ai/deepseek-v4-pro': 1000000,
     'deepseek-ai/deepseek-v4-flash': 1000000,
-=======
-    // New 2026 models
-    'deepseek-ai/deepseek-v4-pro': 1000000,     // 1M tokens! 🔥
-    'deepseek-ai/deepseek-v4-flash': 1000000,   // 1M tokens
-    'moonshotai/kimi-k2.6': 131072,                      // ~131K (estimated, same family as GLM 4.7)
-    'moonshotai/kimi-k2.6': 128000,              // estimated
-    'mistralai/mistral-medium-3.5-128b': 128000,
-    'minimaxai/minimax-m2.7': 128000,
-    // Older models still active
->>>>>>> 91eafa71f6c5b69a41577591fe5b16d78cf6a24b
     'deepseek-ai/deepseek-v3.2': 128000,
     'deepseek-ai/deepseek-r1': 164000,
     'meta/llama-3.3-70b-instruct': 128000,
-    'meta/llama-3.1-70b-instruct': 128000,
-    'meta/llama-3.1-405b-instruct': 128000,
     'mistralai/mistral-medium-3.5-128b': 128000,
     // AgentRouter models
     'glm-5.1': 131072,
@@ -134,7 +96,6 @@ function getBackendConfig(backendName) {
             name: 'AgentRouter',
         };
     }
-    // Default: NVIDIA NIM
     return {
         baseUrl: NIM_API_BASE,
         apiKey: NIM_API_KEY,
@@ -155,17 +116,10 @@ app.get('/health', (req, res) => {
             agentrouter: { configured: !!AGENTROUTER_API_KEY, base: AGENTROUTER_API_BASE },
         },
         top_models: {
-<<<<<<< HEAD
-            'gpt-4-turbo': 'deepseek-ai/deepseek-v4-pro → NVIDIA (1M ctx)',
+            'gpt-4-turbo': 'deepseek-v4-pro → NVIDIA (1M ctx)',
             'gpt-4o':      'glm-5.1 → AgentRouter (131K ctx)',
-            'gpt-4':       'deepseek-ai/deepseek-v4-flash → NVIDIA (1M ctx)',
+            'gpt-4':       'deepseek-v4-flash → NVIDIA (1M ctx)',
             'gpt-4o-mini': 'claude-sonnet-4-6 → AgentRouter (200K ctx)',
-=======
-            'gpt-4-turbo': 'deepseek-ai/deepseek-v4-pro (1M ctx)',
-            'gpt-4o': 'moonshotai/kimi-k2.6 (131K ctx)',
-            'gpt-4': 'google/gemma-4-31b-it (1M ctx)',
-            'gpt-4o-mini': 'mistralai/mistral-medium-3.5-128b (128K ctx)',
->>>>>>> 91eafa71f6c5b69a41577591fe5b16d78cf6a24b
         }
     });
 });
@@ -234,11 +188,9 @@ app.post('/v1/chat/completions', async (req, res) => {
         const contextSize = MODEL_CONTEXT_SIZES[targetModel] || DEFAULT_CONTEXT_SIZE;
         const maxInputTokens = contextSize - RESPONSE_RESERVE_TOKENS;
 
-        // 1. Always keep ALL system messages
         const systemMessages = messages.filter(msg => msg.role === 'system');
         const nonSystemMessages = messages.filter(msg => msg.role !== 'system');
 
-        // 2. Calculate tokens used by system messages
         let usedTokens = 0;
         const cleanedSystemMessages = systemMessages.map(msg => {
             const cleaned = { role: msg.role, content: msg.content || '' };
@@ -246,7 +198,6 @@ app.post('/v1/chat/completions', async (req, res) => {
             return cleaned;
         });
 
-        // 3. Fill remaining context with recent conversation messages (newest first)
         const remainingTokenBudget = maxInputTokens - usedTokens;
         const cleanedConversation = [];
         let conversationTokens = 0;
@@ -263,7 +214,6 @@ app.post('/v1/chat/completions', async (req, res) => {
             conversationTokens += msgTokens;
         }
 
-        // 4. Combine: system messages first, then conversation
         const cleanedMessages = [...cleanedSystemMessages, ...cleanedConversation];
 
         console.log(`📊 Context: ${usedTokens + conversationTokens}/${maxInputTokens} tokens | ${cleanedSystemMessages.length} system + ${cleanedConversation.length}/${nonSystemMessages.length} conversation msgs`);
@@ -277,15 +227,13 @@ app.post('/v1/chat/completions', async (req, res) => {
             stream: stream || false
         };
 
-        // Only add thinking mode for NVIDIA backend
         if (ENABLE_THINKING_MODE && mapping.backend === 'nvidia') {
             apiRequest.extra_body = { chat_template_kwargs: { thinking: true } };
         }
 
-        // 🔍 DEBUG logging
         const payloadJson = JSON.stringify(apiRequest);
         const payloadSizeKB = (Buffer.byteLength(payloadJson, 'utf8') / 1024).toFixed(1);
-        console.log(`🔍 DEBUG: Payload ${payloadSizeKB} KB | Model: ${targetModel} | Backend: ${backend.name} | Messages: ${cleanedMessages.length} | Stream: ${stream || false}`);
+        console.log(`🔍 Payload ${payloadSizeKB} KB | Model: ${targetModel} | Backend: ${backend.name} | Messages: ${cleanedMessages.length} | Stream: ${stream || false}`);
 
         // Make request to the selected backend
         const response = await axios.post(`${backend.baseUrl}/chat/completions`, apiRequest, {
@@ -298,7 +246,6 @@ app.post('/v1/chat/completions', async (req, res) => {
         });
 
         if (stream) {
-            // Handle streaming response
             res.setHeader('Content-Type', 'text/event-stream');
             res.setHeader('Cache-Control', 'no-cache');
             res.setHeader('Connection', 'keep-alive');
@@ -326,21 +273,18 @@ app.post('/v1/chat/completions', async (req, res) => {
 
                                 if (SHOW_REASONING) {
                                     let combinedContent = '';
-
                                     if (reasoning && !reasoningStarted) {
                                         combinedContent = '<think>\n' + reasoning;
                                         reasoningStarted = true;
                                     } else if (reasoning) {
                                         combinedContent = reasoning;
                                     }
-
                                     if (content && reasoningStarted) {
                                         combinedContent += '</think>\n\n' + content;
                                         reasoningStarted = false;
                                     } else if (content) {
                                         combinedContent += content;
                                     }
-
                                     if (combinedContent) {
                                         data.choices[0].delta.content = combinedContent;
                                         delete data.choices[0].delta.reasoning_content;
@@ -368,7 +312,6 @@ app.post('/v1/chat/completions', async (req, res) => {
                 res.end();
             });
         } else {
-            // Transform response to OpenAI format
             const openaiResponse = {
                 id: `chatcmpl-${Date.now()}`,
                 object: 'chat.completion',
@@ -401,7 +344,6 @@ app.post('/v1/chat/completions', async (req, res) => {
         }
 
     } catch (error) {
-        // 🔍 Safe error logging
         const status = error.response?.status || 'N/A';
         const isTimeout = error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT';
 
