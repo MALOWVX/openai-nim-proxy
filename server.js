@@ -55,7 +55,7 @@ const MODEL_MAPPING = {
     'gpt-4-1106-preview': 'google/gemma-4-31b-it',
 
     // Tier 2: Fast & smart
-    'gpt-4o': 'z-ai/glm-5.1',                          // 🔥 Replaces deprecated GLM 4.7
+    'gpt-4o': 'moonshotai/kimi-k2.6',                          // 🔥 Replaces deprecated GLM 4.7
     'gpt-4': 'google/gemma-4-31b-it',           // 284B MoE, 1M context, fast
     'gpt-4-turbo-preview': 'deepseek-ai/deepseek-v3.2', // 685B, still working
 
@@ -73,7 +73,7 @@ const MODEL_CONTEXT_SIZES = {
     // New 2026 models
     'deepseek-ai/deepseek-v4-pro': 1000000,     // 1M tokens! 🔥
     'deepseek-ai/deepseek-v4-flash': 1000000,   // 1M tokens
-    'z-ai/glm-5.1': 131072,                      // ~131K (estimated, same family as GLM 4.7)
+    'moonshotai/kimi-k2.6': 131072,                      // ~131K (estimated, same family as GLM 4.7)
     'moonshotai/kimi-k2.6': 128000,              // estimated
     'mistralai/mistral-medium-3.5-128b': 128000,
     'minimaxai/minimax-m2.7': 128000,
@@ -97,7 +97,7 @@ app.get('/health', (req, res) => {
         thinking_mode: ENABLE_THINKING_MODE,
         top_models: {
             'gpt-4-turbo': 'deepseek-ai/deepseek-v4-pro (1M ctx)',
-            'gpt-4o': 'z-ai/glm-5.1 (131K ctx)',
+            'gpt-4o': 'moonshotai/kimi-k2.6 (131K ctx)',
             'gpt-4': 'google/gemma-4-31b-it (1M ctx)',
             'gpt-4o-mini': 'mistralai/mistral-medium-3.5-128b (128K ctx)',
         }
