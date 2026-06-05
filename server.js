@@ -1,4 +1,4 @@
-// skerver.js - OpenAI to NVIDIA NIM API Proxy
+// server.js - OpenAI Multi-Backend API Proxy (NVIDIA NIM + AgentRouter)
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
@@ -17,9 +17,17 @@ app.use((req, res, next) => {
     next();
 });
 
-// NVIDIA NIM API configuration
+// =============================================
+// 🔧 BACKEND CONFIGURATION
+// =============================================
+
+// Backend 1: NVIDIA NIM
 const NIM_API_BASE = process.env.NIM_API_BASE || 'https://integrate.api.nvidia.com/v1';
 const NIM_API_KEY = process.env.NIM_API_KEY;
+
+// Backend 2: AgentRouter (OpenAI-compatible, free $175 credits)
+const AGENTROUTER_API_BASE = process.env.AGENTROUTER_API_BASE || 'https://agentrouter.org/v1';
+const AGENTROUTER_API_KEY = process.env.AGENTROUTER_API_KEY;
 
 // 🔥 REASONING DISPLAY TOGGLE - Shows/hides reasoning in output
 const SHOW_REASONING = false; // Set to true to show reasoning with <think> tags
@@ -45,61 +53,83 @@ function fixParagraphs(text) {
     return fixed;
 }
 
-// Model mapping (adjust based on available NIM models)
-// NOTE: Some models like deepseek-v3_1-terminus have 404 issues on NVIDIA API
-// Using confirmed working models instead
+// =============================================
+// 🔧 MODEL MAPPING — Dual Backend Routing
+// =============================================
+// Each entry maps an OpenAI model name to:
+//   - backend: 'nvidia' or 'agentrouter'
+//   - model: the actual model ID to send to that backend
+
 const MODEL_MAPPING = {
-    // === 2026 UPDATED MAPPINGS — May 14 ===
-    // Tier 1: Best quality (use for main RP)
-    'gpt-4-turbo': 'deepseek-ai/deepseek-v4-pro',     // 🔥 NEW — 1M context, best DeepSeek
-    'gpt-4-1106-preview': 'deepseek-ai/deepseek-v4-pro',
+    // === NVIDIA NIM Backend — DeepSeek, Llama, Mistral ===
+    'gpt-4-turbo':         { backend: 'nvidia', model: 'deepseek-ai/deepseek-v4-pro' },      // 🔥 1M context, best DeepSeek
+    'gpt-4-1106-preview':  { backend: 'nvidia', model: 'deepseek-ai/deepseek-v4-pro' },
+    'gpt-4':               { backend: 'nvidia', model: 'deepseek-ai/deepseek-v4-flash' },     // 284B MoE, 1M context, fast
+    'gpt-4-turbo-preview': { backend: 'nvidia', model: 'deepseek-ai/deepseek-v3.2' },         // 685B, still working
+    'gpt-4-32k':           { backend: 'nvidia', model: 'meta/llama-3.3-70b-instruct' },
+    'gpt-3.5-turbo':       { backend: 'nvidia', model: 'meta/llama-3.3-70b-instruct' },
+    'gpt-3.5-turbo-16k':   { backend: 'nvidia', model: 'meta/llama-3.3-70b-instruct' },
 
-    // Tier 2: Fast & smart
-    'gpt-4o': 'z-ai/glm-5.1',                          // 🔥 Replaces deprecated GLM 4.7
-    'gpt-4': 'deepseek-ai/deepseek-v4-flash',           // 284B MoE, 1M context, fast
-    'gpt-4-turbo-preview': 'deepseek-ai/deepseek-v3.2', // 685B, still working
-
-    // Tier 3: Lighter / fallback
-    'gpt-4o-mini': 'mistralai/mistral-medium-3.5-128b',  // 128B, solid for chat
-    'gpt-4-32k': 'meta/llama-3.3-70b-instruct',          // Llama, still working
-    'gpt-3.5-turbo': 'meta/llama-3.3-70b-instruct',
-    'gpt-3.5-turbo-16k': 'meta/llama-3.3-70b-instruct',
+    // === AgentRouter Backend — GLM, Claude ===
+    'gpt-4o':              { backend: 'agentrouter', model: 'glm-5.1' },                      // 🔥 GLM 5.1 via AgentRouter (was broken on NVIDIA)
+    'gpt-4o-mini':         { backend: 'agentrouter', model: 'claude-sonnet-4-6' },             // 🔥 Claude Sonnet 4.6 via AgentRouter
 };
 
-// 🔥 Context window sizes per NIM model (in tokens)
-// Set to the REAL model max — Janitor.ai already limits on its side,
-// this acts as a safety net if the client sends too much
+// 🔥 Context window sizes per model (in tokens)
 const MODEL_CONTEXT_SIZES = {
-    // New 2026 models
-    'deepseek-ai/deepseek-v4-pro': 1000000,     // 1M tokens! 🔥
-    'deepseek-ai/deepseek-v4-flash': 1000000,   // 1M tokens
-    'z-ai/glm-5.1': 131072,                      // ~131K (estimated, same family as GLM 4.7)
-    'moonshotai/kimi-k2.6': 128000,              // estimated
-    'mistralai/mistral-medium-3.5-128b': 128000,
-    'minimaxai/minimax-m2.7': 128000,
-    // Older models still active
+    // NVIDIA models
+    'deepseek-ai/deepseek-v4-pro': 1000000,
+    'deepseek-ai/deepseek-v4-flash': 1000000,
     'deepseek-ai/deepseek-v3.2': 128000,
     'deepseek-ai/deepseek-r1': 164000,
     'meta/llama-3.3-70b-instruct': 128000,
     'meta/llama-3.1-70b-instruct': 128000,
     'meta/llama-3.1-405b-instruct': 128000,
+    'mistralai/mistral-medium-3.5-128b': 128000,
+    // AgentRouter models
+    'glm-5.1': 131072,
+    'claude-sonnet-4-5': 200000,
+    'claude-sonnet-4-6': 200000,
 };
-const DEFAULT_CONTEXT_SIZE = 128000;  // Most models support at least 128K now
-const RESPONSE_RESERVE_TOKENS = 4096; // Reserve for model output
+const DEFAULT_CONTEXT_SIZE = 128000;
+const RESPONSE_RESERVE_TOKENS = 4096;
+
+// =============================================
+// 🔧 BACKEND ROUTING HELPER
+// =============================================
+function getBackendConfig(backendName) {
+    if (backendName === 'agentrouter') {
+        return {
+            baseUrl: AGENTROUTER_API_BASE,
+            apiKey: AGENTROUTER_API_KEY,
+            name: 'AgentRouter',
+        };
+    }
+    // Default: NVIDIA NIM
+    return {
+        baseUrl: NIM_API_BASE,
+        apiKey: NIM_API_KEY,
+        name: 'NVIDIA NIM',
+    };
+}
 
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.json({
         status: 'ok',
-        service: 'OpenAI to NVIDIA NIM Proxy',
-        updated: '2026-05-14',
+        service: 'OpenAI Multi-Backend Proxy (NVIDIA NIM + AgentRouter)',
+        updated: '2026-06-05',
         reasoning_display: SHOW_REASONING,
         thinking_mode: ENABLE_THINKING_MODE,
+        backends: {
+            nvidia: { configured: !!NIM_API_KEY, base: NIM_API_BASE },
+            agentrouter: { configured: !!AGENTROUTER_API_KEY, base: AGENTROUTER_API_BASE },
+        },
         top_models: {
-            'gpt-4-turbo': 'deepseek-ai/deepseek-v4-pro (1M ctx)',
-            'gpt-4o': 'z-ai/glm-5.1 (131K ctx)',
-            'gpt-4': 'deepseek-ai/deepseek-v4-flash (1M ctx)',
-            'gpt-4o-mini': 'mistralai/mistral-medium-3.5-128b (128K ctx)',
+            'gpt-4-turbo': 'deepseek-ai/deepseek-v4-pro → NVIDIA (1M ctx)',
+            'gpt-4o':      'glm-5.1 → AgentRouter (131K ctx)',
+            'gpt-4':       'deepseek-ai/deepseek-v4-flash → NVIDIA (1M ctx)',
+            'gpt-4o-mini': 'claude-sonnet-4-6 → AgentRouter (200K ctx)',
         }
     });
 });
@@ -110,7 +140,7 @@ app.get('/v1/models', (req, res) => {
         id: model,
         object: 'model',
         created: Date.now(),
-        owned_by: 'nvidia-nim-proxy'
+        owned_by: 'multi-backend-proxy'
     }));
 
     res.json({
@@ -135,27 +165,40 @@ app.post('/v1/chat/completions', async (req, res) => {
             });
         }
 
-        // Smart model selection with fallback (moved BEFORE message trimming to know context size)
-        let nimModel = MODEL_MAPPING[model];
-        if (!nimModel) {
-            // No probe test — just use smart fallback based on model name
+        // Smart model selection with fallback
+        let mapping = MODEL_MAPPING[model];
+        if (!mapping) {
             const modelLower = (model || '').toLowerCase();
             if (modelLower.includes('gpt-4') || modelLower.includes('claude-3') || modelLower.includes('claude-opus') || modelLower.includes('405b')) {
-                nimModel = 'deepseek-ai/deepseek-v4-pro';    // Best: 1M context
+                mapping = { backend: 'nvidia', model: 'deepseek-ai/deepseek-v4-pro' };
             } else if (modelLower.includes('claude') || modelLower.includes('gemini') || modelLower.includes('70b')) {
-                nimModel = 'deepseek-ai/deepseek-v4-flash';  // Fast: 284B MoE, 1M context
+                mapping = { backend: 'nvidia', model: 'deepseek-ai/deepseek-v4-flash' };
             } else {
-                nimModel = 'meta/llama-3.3-70b-instruct';    // Safe default
+                mapping = { backend: 'nvidia', model: 'meta/llama-3.3-70b-instruct' };
             }
-            console.log(`⚠️ Unknown model "${model}" → fallback to ${nimModel}`);
+            console.log(`⚠️ Unknown model "${model}" → fallback to ${mapping.model} (${mapping.backend})`);
+        }
+
+        const targetModel = mapping.model;
+        const backend = getBackendConfig(mapping.backend);
+
+        // Check that the backend API key is configured
+        if (!backend.apiKey) {
+            console.error(`❌ Backend ${backend.name} has no API key configured!`);
+            return res.status(500).json({
+                error: {
+                    message: `Backend ${backend.name} is not configured (missing API key). Set ${mapping.backend === 'agentrouter' ? 'AGENTROUTER_API_KEY' : 'NIM_API_KEY'} environment variable.`,
+                    type: 'configuration_error',
+                    code: 500
+                }
+            });
         }
 
         // 🔥 TOKEN-AWARE CONTEXT MANAGEMENT
-        // Use the model's actual context window instead of an arbitrary message limit
-        const contextSize = MODEL_CONTEXT_SIZES[nimModel] || DEFAULT_CONTEXT_SIZE;
+        const contextSize = MODEL_CONTEXT_SIZES[targetModel] || DEFAULT_CONTEXT_SIZE;
         const maxInputTokens = contextSize - RESPONSE_RESERVE_TOKENS;
 
-        // 1. Always keep ALL system messages (bot identity, hero descriptions, etc.)
+        // 1. Always keep ALL system messages
         const systemMessages = messages.filter(msg => msg.role === 'system');
         const nonSystemMessages = messages.filter(msg => msg.role !== 'system');
 
@@ -163,7 +206,7 @@ app.post('/v1/chat/completions', async (req, res) => {
         let usedTokens = 0;
         const cleanedSystemMessages = systemMessages.map(msg => {
             const cleaned = { role: msg.role, content: msg.content || '' };
-            usedTokens += estimateTokens(cleaned.content) + 4; // +4 for role/formatting overhead
+            usedTokens += estimateTokens(cleaned.content) + 4;
             return cleaned;
         });
 
@@ -172,16 +215,15 @@ app.post('/v1/chat/completions', async (req, res) => {
         const cleanedConversation = [];
         let conversationTokens = 0;
 
-        // Iterate from newest to oldest, keep as many as fit
         for (let i = nonSystemMessages.length - 1; i >= 0; i--) {
             const msg = nonSystemMessages[i];
             const cleaned = { role: msg.role, content: msg.content || '' };
             const msgTokens = estimateTokens(cleaned.content) + 4;
 
             if (conversationTokens + msgTokens > remainingTokenBudget) {
-                break; // No more room
+                break;
             }
-            cleanedConversation.unshift(cleaned); // Add to front to maintain order
+            cleanedConversation.unshift(cleaned);
             conversationTokens += msgTokens;
         }
 
@@ -190,40 +232,37 @@ app.post('/v1/chat/completions', async (req, res) => {
 
         console.log(`📊 Context: ${usedTokens + conversationTokens}/${maxInputTokens} tokens | ${cleanedSystemMessages.length} system + ${cleanedConversation.length}/${nonSystemMessages.length} conversation msgs`);
 
-
-        // Transform OpenAI request to NIM format
-        const nimRequest = {
-            model: nimModel,
-            messages: cleanedMessages, // Use cleaned messages
+        // Build request (OpenAI format — works for both backends)
+        const apiRequest = {
+            model: targetModel,
+            messages: cleanedMessages,
             temperature: temperature || 0.6,
-            max_tokens: Math.min(max_tokens || 2048, 8192), // Limit max_tokens
+            max_tokens: Math.min(max_tokens || 2048, 8192),
             stream: stream || false
         };
 
-        // Only add extra_body if thinking mode is enabled
-        if (ENABLE_THINKING_MODE) {
-            nimRequest.extra_body = { chat_template_kwargs: { thinking: true } };
+        // Only add thinking mode for NVIDIA backend
+        if (ENABLE_THINKING_MODE && mapping.backend === 'nvidia') {
+            apiRequest.extra_body = { chat_template_kwargs: { thinking: true } };
         }
 
-        // 🔍 DEBUG: Log payload size to diagnose large request issues
-        const payloadJson = JSON.stringify(nimRequest);
+        // 🔍 DEBUG logging
+        const payloadJson = JSON.stringify(apiRequest);
         const payloadSizeKB = (Buffer.byteLength(payloadJson, 'utf8') / 1024).toFixed(1);
-        console.log(`🔍 DEBUG: Payload size: ${payloadSizeKB} KB | Model: ${nimModel} | Messages: ${cleanedMessages.length} | Stream: ${stream || false}`);
+        console.log(`🔍 DEBUG: Payload ${payloadSizeKB} KB | Model: ${targetModel} | Backend: ${backend.name} | Messages: ${cleanedMessages.length} | Stream: ${stream || false}`);
 
-        console.log('Sending to NVIDIA:', { model: nimModel, messageCount: cleanedMessages.length });
-
-        // Make request to NVIDIA NIM API (120s timeout to avoid infinite hangs)
-        const response = await axios.post(`${NIM_API_BASE}/chat/completions`, nimRequest, {
+        // Make request to the selected backend
+        const response = await axios.post(`${backend.baseUrl}/chat/completions`, apiRequest, {
             headers: {
-                'Authorization': `Bearer ${NIM_API_KEY}`,
+                'Authorization': `Bearer ${backend.apiKey}`,
                 'Content-Type': 'application/json'
             },
             responseType: stream ? 'stream' : 'json',
-            timeout: 120000 // 120 seconds
+            timeout: 120000
         });
 
         if (stream) {
-            // Handle streaming response with reasoning
+            // Handle streaming response
             res.setHeader('Content-Type', 'text/event-stream');
             res.setHeader('Cache-Control', 'no-cache');
             res.setHeader('Connection', 'keep-alive');
@@ -293,7 +332,7 @@ app.post('/v1/chat/completions', async (req, res) => {
                 res.end();
             });
         } else {
-            // Transform NIM response to OpenAI format with reasoning
+            // Transform response to OpenAI format
             const openaiResponse = {
                 id: `chatcmpl-${Date.now()}`,
                 object: 'chat.completion',
@@ -326,19 +365,17 @@ app.post('/v1/chat/completions', async (req, res) => {
         }
 
     } catch (error) {
-        // 🔍 Safe error logging — handles circular references, streams, HTML responses
+        // 🔍 Safe error logging
         const status = error.response?.status || 'N/A';
         const isTimeout = error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT';
 
-        // Safely extract error detail from various response shapes
         let errorDetail = error.message || 'unknown error';
         try {
-            const nvidiaError = error.response?.data;
-            if (nvidiaError && typeof nvidiaError === 'string') {
-                errorDetail = nvidiaError.slice(0, 500);
-            } else if (nvidiaError && typeof nvidiaError === 'object') {
-                // Only access simple string properties — avoid anything that could be a stream/socket
-                const extracted = nvidiaError.detail || nvidiaError.error?.message || nvidiaError.message;
+            const backendError = error.response?.data;
+            if (backendError && typeof backendError === 'string') {
+                errorDetail = backendError.slice(0, 500);
+            } else if (backendError && typeof backendError === 'object') {
+                const extracted = backendError.detail || backendError.error?.message || backendError.message;
                 if (typeof extracted === 'string') {
                     errorDetail = extracted;
                 }
@@ -348,7 +385,7 @@ app.post('/v1/chat/completions', async (req, res) => {
         }
 
         if (isTimeout) {
-            errorDetail = `NVIDIA API timeout after 120s — the model may be overloaded. Original: ${error.message}`;
+            errorDetail = `Backend API timeout after 120s — the model may be overloaded. Original: ${error.message}`;
         }
 
         console.error(`❌ Proxy error: status=${status} | timeout=${isTimeout} | ${errorDetail}`);
@@ -375,8 +412,9 @@ app.all('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`OpenAI to NVIDIA NIM Proxy running on port ${PORT}`);
+    console.log(`OpenAI Multi-Backend Proxy running on port ${PORT}`);
     console.log(`Health check: http://localhost:${PORT}/health`);
+    console.log(`Backends: NVIDIA NIM ${NIM_API_KEY ? '✅' : '❌'} | AgentRouter ${AGENTROUTER_API_KEY ? '✅' : '❌'}`);
     console.log(`Reasoning display: ${SHOW_REASONING ? 'ENABLED' : 'DISABLED'}`);
     console.log(`Thinking mode: ${ENABLE_THINKING_MODE ? 'ENABLED' : 'DISABLED'}`);
 });
