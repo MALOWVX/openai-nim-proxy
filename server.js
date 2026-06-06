@@ -360,7 +360,22 @@ app.post('/v1/chat/completions', async (req, res) => {
         let errorDetail = error.message || 'unknown error';
         try {
             const backendError = error.response?.data;
-            if (backendError && typeof backendError === 'string') {
+            if (backendError && typeof backendError.on === 'function') {
+                // It's a stream! We need to read it to get the error details
+                const streamData = await new Promise((resolve) => {
+                    let body = '';
+                    backendError.on('data', chunk => body += chunk.toString());
+                    backendError.on('end', () => resolve(body));
+                    backendError.on('error', () => resolve(''));
+                    setTimeout(() => resolve(body), 2000); // 2s timeout
+                });
+                try {
+                    const parsed = JSON.parse(streamData);
+                    errorDetail = parsed.detail || parsed.error?.message || parsed.message || streamData;
+                } catch (e) {
+                    errorDetail = streamData || error.message;
+                }
+            } else if (backendError && typeof backendError === 'string') {
                 errorDetail = backendError.slice(0, 500);
             } else if (backendError && typeof backendError === 'object') {
                 const extracted = backendError.detail || backendError.error?.message || backendError.message;
