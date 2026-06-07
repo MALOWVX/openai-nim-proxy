@@ -259,12 +259,16 @@ function sendStreamResponse(res, response, model) {
         lines.forEach(line => {
             if (line.startsWith('data: ')) {
                 if (line.includes('[DONE]')) {
-                    res.write(line + '\n');
+                    res.write(line + '\n\n');
                     return;
                 }
 
                 try {
                     const data = JSON.parse(line.slice(6));
+                    if (!data || typeof data !== 'object') {
+                        // Skip empty or non-object events (e.g., data: null)
+                        return;
+                    }
                     if (data.choices?.[0]?.delta) {
                         const reasoning = data.choices[0].delta.reasoning_content;
                         const content = data.choices[0].delta.content;
@@ -298,7 +302,7 @@ function sendStreamResponse(res, response, model) {
                     }
                     res.write(`data: ${JSON.stringify(data)}\n\n`);
                 } catch (e) {
-                    res.write(line + '\n');
+                    res.write(line + '\n\n');
                 }
             }
         });
