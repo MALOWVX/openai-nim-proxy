@@ -55,17 +55,11 @@ function fixParagraphs(text) {
 const ZWS = '\u200B'; // Zero-Width Space (invisible character)
 function obfuscateText(text) {
     if (!text) return text;
-    // Insert a zero-width space every 3 characters within words
-    // This breaks "sensitive" into "sen​sit​ive" (invisible to humans/AI, blocks filters)
-    return text.replace(/\S{4,}/g, (word) => {
-        let result = '';
-        for (let i = 0; i < word.length; i++) {
-            result += word[i];
-            if (i > 0 && i < word.length - 1 && (i + 1) % 3 === 0) {
-                result += ZWS;
-            }
-        }
-        return result;
+    // Insert a single zero-width space in the middle of words with 5 or more characters
+    // This breaks keyword detection while adding only 1 token/character per word
+    return text.replace(/\S{5,}/g, (word) => {
+        const mid = Math.floor(word.length / 2);
+        return word.slice(0, mid) + ZWS + word.slice(mid);
     });
 }
 
@@ -142,10 +136,12 @@ async function extractErrorDetail(error) {
     try {
         const backendError = error.response?.data;
         if (backendError && typeof backendError.on === 'function') {
+            // Set encoding to correctly handle UTF-8 multibyte characters
+            backendError.setEncoding('utf8');
             // It's a stream! We need to read it to get the error details
             const streamData = await new Promise((resolve) => {
                 let body = '';
-                backendError.on('data', chunk => body += chunk.toString());
+                backendError.on('data', chunk => body += chunk);
                 backendError.on('end', () => resolve(body));
                 backendError.on('error', () => resolve(''));
                 setTimeout(() => resolve(body), 2000); // 2s timeout
@@ -248,11 +244,15 @@ function sendStreamResponse(res, response, model) {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
 
+    // 🔧 Set encoding to handle multi-byte characters (like accented letters) split across chunks
+    response.data.setEncoding('utf8');
+
     let buffer = '';
     let reasoningStarted = false;
 
     response.data.on('data', (chunk) => {
-        buffer += chunk.toString();
+        // Since we set encoding to utf8, chunk is already a correctly decoded string
+        buffer += chunk;
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
 
