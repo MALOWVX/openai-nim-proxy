@@ -480,13 +480,28 @@ app.post('/v1/chat/completions', async (req, res) => {
             response = await makeBackendRequest(currentBackend, apiRequest, stream);
         } catch (primaryError) {
             // =============================================
-            // 🔥 FALLBACK: If AgentRouter blocks with "sensitive words detected",
+            // 🔥 FALLBACK: If AgentRouter fails (sensitive words, rate limit, server error 502/503/504, or network timeout),
             //    automatically retry through NVIDIA NIM (DeepSeek v4 Pro)
             // =============================================
             const errorDetail = await extractErrorDetail(primaryError);
+            const status = primaryError.response?.status;
+            
+            const isSensitiveWords = errorDetail.includes('sensitive words');
+            const isServerOrRateLimitError = status === 429 || (status >= 500 && status <= 504);
+            const isNetworkError = !primaryError.response || 
+                                   ['ECONNABORTED', 'ETIMEDOUT', 'ENOTFOUND', 'ECONNREFUSED'].includes(primaryError.code);
 
-            if (currentBackend === 'agentrouter' && errorDetail.includes('sensitive words detected') && NIM_API_KEY) {
-                console.log(`⚠️ AgentRouter blocked: "${errorDetail}"`);
+            const shouldFallback = currentBackend === 'agentrouter' && 
+                                   (isSensitiveWords || isServerOrRateLimitError || isNetworkError) && 
+                                   !!NIM_API_KEY;
+
+            if (shouldFallback) {
+                let reason = 'unknown error';
+                if (isSensitiveWords) reason = 'sensitive words filter';
+                else if (isServerOrRateLimitError) reason = `server status ${status}`;
+                else if (isNetworkError) reason = `network error (${primaryError.code || 'timeout'})`;
+
+                console.log(`⚠️ AgentRouter failed: "${errorDetail.slice(0, 200)}" (${reason})`);
                 console.log(`🔄 FALLBACK → Retrying via NVIDIA NIM (${SENSITIVE_WORDS_FALLBACK.model})...`);
 
                 // Switch to NVIDIA fallback
@@ -504,14 +519,14 @@ app.post('/v1/chat/completions', async (req, res) => {
                     console.error(`❌ Fallback also failed: ${fallbackDetail}`);
                     return res.status(fallbackError.response?.status || (isTimeout ? 504 : 500)).json({
                         error: {
-                            message: `AgentRouter blocked (sensitive words) → NVIDIA fallback also failed: ${fallbackDetail}`,
+                            message: `AgentRouter failed (${reason}) → NVIDIA fallback also failed: ${fallbackDetail}`,
                             type: isTimeout ? 'timeout_error' : 'invalid_request_error',
                             code: fallbackError.response?.status || (isTimeout ? 504 : 500)
                         }
                     });
                 }
             } else {
-                // Not a "sensitive words" error or not AgentRouter — throw normally
+                // Not a fallback candidate or not AgentRouter — throw normally
                 throw primaryError;
             }
         }
