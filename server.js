@@ -53,14 +53,40 @@ function fixParagraphs(text) {
 // 🛡️ OBFUSCATION: Insert zero-width spaces to bypass sensitive word filters
 // The AI model ignores these invisible chars, but keyword filters can't match words
 const ZWS = '\u200B'; // Zero-Width Space (invisible character)
-function obfuscateText(text) {
-    if (!text) return text;
-    // Insert a single zero-width space in the middle of words with 5 or more characters
-    // This breaks keyword detection while adding only 1 token/character per word
-    return text.replace(/\S{5,}/g, (word) => {
-        const mid = Math.floor(word.length / 2);
-        return word.slice(0, mid) + ZWS + word.slice(mid);
-    });
+function obfuscateText(val) {
+    if (!val) return val;
+    
+    // If it's a plain string, obfuscate it
+    if (typeof val === 'string') {
+        return val.replace(/\S{5,}/g, (word) => {
+            const mid = Math.floor(word.length / 2);
+            return word.slice(0, mid) + ZWS + word.slice(mid);
+        });
+    }
+    
+    // If it's an array (e.g. array of content blocks), recurse on elements
+    if (Array.isArray(val)) {
+        return val.map(obfuscateText);
+    }
+    
+    // If it's an object, recurse only on text/content properties to avoid breaking API schema
+    if (typeof val === 'object') {
+        const result = {};
+        for (const key in val) {
+            if (Object.prototype.hasOwnProperty.call(val, key)) {
+                if (key === 'text' || key === 'content') {
+                    result[key] = obfuscateText(val[key]);
+                } else if (typeof val[key] === 'object' && val[key] !== null) {
+                    result[key] = obfuscateText(val[key]);
+                } else {
+                    result[key] = val[key]; // Keep other fields (like role, type, url) as-is
+                }
+            }
+        }
+        return result;
+    }
+    
+    return val;
 }
 
 // Apply obfuscation to all messages in a conversation
