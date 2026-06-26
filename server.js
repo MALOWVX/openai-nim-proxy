@@ -113,7 +113,7 @@ const MODEL_MAPPING = {
 
     // === AgentRouter Backend — GLM, Claude ===
     'gpt-4o':              { backend: 'agentrouter', model: 'glm-5.1' },
-    'gpt-4o-mini':         { backend: 'agentrouter', model: 'claude-sonnet-4-6' },
+    'gpt-4o-mini':         { backend: 'agentrouter', model: 'claude-opus-4-6' },
 };
 
 // 🔥 Fallback model when AgentRouter blocks with "sensitive words detected"
