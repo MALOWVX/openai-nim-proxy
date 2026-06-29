@@ -105,7 +105,7 @@ const MODEL_MAPPING = {
     // === NVIDIA NIM Backend — DeepSeek, Llama, Mistral ===
     'gpt-4-turbo':         { backend: 'nvidia', model: 'google/gemma-4-31b-it' },
     'gpt-4-1106-preview':  { backend: 'nvidia', model: 'deepseek-ai/deepseek-v4-pro' },
-    'gpt-4':               { backend: 'nvidia', model: 'deepseek-ai/deepseek-v4-flash' },
+    'gpt-4':               { backend: 'nvidia', model: 'z-ai/glm-5.1' },
     'gpt-4-turbo-preview': { backend: 'nvidia', model: 'deepseek-ai/deepseek-v3.2' },
     'gpt-4-32k':           { backend: 'nvidia', model: 'meta/llama-3.3-70b-instruct' },
     'gpt-3.5-turbo':       { backend: 'nvidia', model: 'meta/llama-3.3-70b-instruct' },
@@ -241,7 +241,7 @@ app.get('/health', (req, res) => {
         top_models: {
             'gpt-4-turbo': 'deepseek-v4-pro → NVIDIA (1M ctx)',
             'gpt-4o':      'glm-5.1 → AgentRouter (131K ctx)',
-            'gpt-4':       'deepseek-v4-flash → NVIDIA (1M ctx)',
+            'gpt-4':       'z-ai/glm-5.1 → NVIDIA (1M ctx)',
             'gpt-4o-mini': 'claude-sonnet-4-6 → AgentRouter (200K ctx)',
         }
     });
