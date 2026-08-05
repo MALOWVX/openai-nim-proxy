@@ -107,7 +107,7 @@ const MODEL_MAPPING = {
     'gpt-4-1106-preview':  { backend: 'nvidia', model: 'deepseek-ai/deepseek-v4-pro' },
     'gpt-4':               { backend: 'nvidia', model: 'z-ai/glm-5.2' },
     'gpt-4-turbo-preview': { backend: 'nvidia', model: 'minimaxai/minimax-m3' },
-    'gpt-4-32k':           { backend: 'nvidia', model: 'meta/llama-3.3-70b-instruct' },
+    'gpt-4-32k':           { backend: 'nvidia', model: 'deepseek-ai/deepseek-v4-pro' },
     'gpt-3.5-turbo':       { backend: 'nvidia', model: 'meta/llama-3.3-70b-instruct' },
     'gpt-3.5-turbo-16k':   { backend: 'nvidia', model: 'meta/llama-3.3-70b-instruct' },
 
