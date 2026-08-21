@@ -108,7 +108,7 @@ const MODEL_MAPPING = {
     'gpt-4':               { backend: 'nvidia', model: 'z-ai/glm-5.2' },
     'deepseek-ai/deepseek-v4-flash-0731': { backend: 'nvidia', model: 'minimaxai/minimax-m3' },
     'gpt-4-32k':           { backend: 'nvidia', model: 'deepseek-ai/deepseek-v4-pro' },
-    'gpt-3.5-turbo':       { backend: 'nvidia', model: 'meta/llama-3.3-70b-instruct' },
+    'gpt-3.5-turbo':       { backend: 'nvidia', model: 'deepseek-ai/deepseek-v4-flash-0731' },
     'gpt-3.5-turbo-16k':   { backend: 'nvidia', model: 'meta/llama-3.3-70b-instruct' },
 
     // === AgentRouter Backend — GLM, Claude ===
