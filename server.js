@@ -104,7 +104,7 @@ function obfuscateMessages(messages) {
 const MODEL_MAPPING = {
     // === NVIDIA NIM Backend — DeepSeek, Llama, Mistral ===
     'gpt-4-turbo':         { backend: 'nvidia', model: 'google/gemma-4-31b-it' },
-    'gpt-4-1106-preview':  { backend: 'nvidia', model: 'deepseek-ai/deepseek-v4-pro' },
+    'gpt-4-1106-preview':  { backend: 'nvidia', model: 'moonshotai/kimi-k3' },
     'gpt-4':               { backend: 'nvidia', model: 'deepseek-ai/deepseek-v4-pro-0813' },
     'gpt-4-turbo-preview': { backend: 'nvidia', model: 'minimaxai/minimax-m3' },
     'gpt-4-32k':           { backend: 'nvidia', model: 'deepseek-ai/deepseek-v4-pro' },
